@@ -1,4 +1,14 @@
-# Splunk Search Addon for the Malware Information Sharing Platform
+# Splunk Search Addon for MISP
+
+## Installation
+1. Place the app under $SPLUNK_HOME/etc/apps/TA-MISP
+2. Run the following to install the python2 MISP pymisp package
+```
+pip2 install -r TA-MISP/bin/requirements.txt
+```
+3. Configure a url (ie: https://misp.example.net:8000) and API Key in the app's setup screen. You must set the Realm field to "MISP".
+
+
 ## Usage
 This addon for Splunk contains a custom search command called "mispsearch". The command can take a combination of event= and tag= parameters where multiple events and tags can be specified using comma seperated lists to return results from all matching MISP events. For example:
 ```
@@ -22,10 +32,4 @@ Finally, the search parameter can be specified to return results in a format tha
 Wrapping the above in a subsearch (square brackets) will result in the results being searched within Splunk. For example:
 ```
 index=proxy sourcetype=bluecoat [| mispsearch event="3231" type="url" search=True | format]
-```
-
-## Installation
-This TA can be install by placing it under /opt/splunk/etc/apps on your Splunk search head. It's not required to be installed on any other servers (ie: indexers). The "mispsearch" command relies upon the PyMISP library to be installed before it'll work. So, once the app is installed, you'll need to run the following from the app's folder on your serach head.
-```
-pip2 install -r TA-MISP/bin/requirements.txt
 ```

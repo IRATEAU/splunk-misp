@@ -5,17 +5,51 @@ import re
 import sys
 import csv
 import json
+import requests
 
 # We need to import from the OS' python packages directory
 sys.path.append('/usr/lib/python2.7/site-packages')
 from pymisp import PyMISP
 
-misp_url = "http://misp.example.net"
-misp_apikey = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 verifyCert = False
 
 DEFAULT_FIELDS = ["category", "type", "value", "comment", "to_ids"]
 SEARCH_FIELDS = ["search"]
+
+
+def getSplunkCredential(realm):
+    # Read the session key from stdin
+    # passauth=true must be set in commands.conf and a password must have been saved using the app's setup page
+    if sys.stdin.closed:
+        return
+
+    stdin = sys.stdin.read()
+    session_key = re.search('<authToken>(.+?)<\/authToken>', stdin).group(1)
+
+    # REST request Splunk password endpoint with the correct creds
+    headers = {"Authorization": "Splunk " + session_key, "Content-Type":"application/json", "Accept":"application/json"} 
+    response = requests.get("https://localhost:8089/servicesNS/nobody/search/storage/passwords?output_mode=json&count=0",  headers=headers, verify=verifyCert) 
+
+    if response.status_code != 200: 
+        print('Splunk password request failed. Status:', response.status_code, 'Headers:', response.headers, 'Error Response:', response.content, file=sys.stderr)
+        raise ValueError('Splunk returned an error')
+
+    # Parse the json response
+    try:
+        data_resp = json.loads(response.content)
+    except ValueError:
+        print('Unable to parse Splunk password store response as JSON.', file=sys.stderr)
+        print(response.content, file=sys.stderr)
+        raise ValueError('Splunk returned unexpected content')
+
+    # Loop over all the credentials and look for the realm we need. 
+    # It'd be nice if splunk could just give the only credental you wanted
+    for entry in data_resp['entry']:
+        if entry['content']['realm'] == realm: 
+            return entry['content']['username'], entry['content']['clear_password']
+
+    raise ValueError('Credential with realm ' + realm + ' not found in password store')
+
 
 def main():
     event_ids = []
@@ -24,6 +58,9 @@ def main():
     attr_type = None
     attr_category = None
     attr_to_ids = None
+    
+    # Get MISP credentials from Splunk
+    misp_url, misp_apikey = getSplunkCredential('MISP')
 
     # Parse parameters
     for param in sys.argv:
